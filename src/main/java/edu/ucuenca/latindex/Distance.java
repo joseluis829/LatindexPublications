@@ -37,6 +37,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -60,6 +61,7 @@ import org.simmetrics.tokenizers.Tokenizers;
 import org.simmetrics.StringMetric;
 import static org.simmetrics.StringMetricBuilder.with;
 import org.simmetrics.metrics.JaccardSimilarity;
+import org.simmetrics.metrics.JaroWinkler;
 
 
 
@@ -82,9 +84,9 @@ public class Distance {
 
     JsonObject config = null;
 
-    
-    
-   
+    String[] stopWords = {"Print", "En línea", "Impresa", "Online)", "Internet)", "Imprimé", "On-line", "Impresso", "En ligne"};
+
+    String[] tokens = {"\\.", ":", "\\(", "-", "\\)"};
 
 
     public Distance() throws IOException, ClassNotFoundException {
@@ -822,6 +824,40 @@ public class Distance {
                 .tokenize(Tokenizers.qGram(2)).tokenizerCache().build();
 
         return metric2.compare(param1, param2);
+    }
+    
+    public float jaroWinkler(String param1, String param2) {
+        StringMetric metric
+                = with(new JaroWinkler())
+                .simplify(Simplifiers.removeDiacritics())
+                .simplify(Simplifiers.toLowerCase()).build();
+
+        return metric.compare(param1, param2);
+    }
+    
+    public Set<String> getSetNames(String n) {
+        Set<String> list = new HashSet<>();
+        for (String token : tokens) {
+            list.addAll(Tokenizer(n, token));
+        }
+        return list;
+    }
+    
+    private List<String> Tokenizer(String n, String token) {
+        n = Clean(n);
+        String[] tokens = n.split(token);
+        List<String> list = new ArrayList<String>(Arrays.asList(tokens));
+        list.removeAll(Arrays.asList("", null));
+        return list;
+    }
+    
+    private String Clean(String n) {
+        
+        for (String stopWord : stopWords) {
+            n = n.replace(stopWord, "");
+        }
+        
+        return n;
     }
     
 
