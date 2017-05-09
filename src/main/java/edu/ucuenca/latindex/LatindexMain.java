@@ -55,10 +55,11 @@ public class LatindexMain {
         
         tokenizeMagazinesJson();
         
+        /*String title = "Biomedica";
+        String magazine = "Biomédica";
         
-        if (true)
-            return;
-        
+        Double coefficient = (distance.cosineSimilarityAndLevenshteinDistance(title, magazine) + distance.jaccardSimilarity(title, magazine)) / 2;
+        */
         //Get authors 0.87 >=14
         String queryPublications = "PREFIX bibo: <http://purl.org/ontology/bibo/>"
                 + "PREFIX owl: <http://www.w3.org/2002/07/owl#> "
@@ -68,7 +69,7 @@ public class LatindexMain {
                 + "SELECT DISTINCT ?publication ?issn ?revista ?pubName ?journal WHERE {  "
                 + "  GRAPH<http://ucuenca.edu.ec/wkhuska>{     "
                 + "    ?author foaf:publications ?publication."//;  "
-                //+ "             dct:provenance ?endpoint. "
+                + "    ?author dct:provenance ?endpoint. "
                 + "    ?publication <http://ucuenca.edu.ec/ontology#origin> ?provider. "
                 + "    optional{?publication <http://prismstandard.org/namespaces/basic/2.0/issn> ?issn}. "
                 + "    optional{?publication bibo:Conference ?revista}. "
@@ -77,13 +78,13 @@ public class LatindexMain {
                 //+ "    filter (!regex(?provider, \"Scopus\", \"i\"))."
                 //+ "    filter (regex(?provider, \"Dspace\", \"i\"))."
                 //+ "    filter (!regex(?provider, \"Latindex\", \"i\"))."
-                /*+ "     {"
+                + "     {"
                 + "         SELECT * { "
-                + "        	GRAPH <http://ucuenca.edu.ec/wkhuska/endpoints> { "
+                + "        	GRAPH <http://localhost:8080/context/endpoints> { "
                 + "              ?endpoint uc:name \"UCUENCA\"^^xsd:string . "
                 + "            } "
                 + "         } "
-                + "     }"*/
+                + "     }"
                 + "  } "
                 + "}";
 
@@ -91,7 +92,7 @@ public class LatindexMain {
         PrintWriter out = new PrintWriter("LatindexProviderFromJSON_1.csv");
         PrintWriter distanceFile = new PrintWriter("LatindexDistance.csv");
 
-        Repository repo = new SPARQLRepository("http://redi.cedia.org.ec:8080/sparql/select");
+        Repository repo = new SPARQLRepository("http://localhost:8080/sparql/select");
         Repository repoUpdate = new SPARQLRepository("http://localhost:8080/sparql/update");
 
         repo.initialize();
@@ -113,28 +114,42 @@ public class LatindexMain {
                 BindingSet binding = resulta.next();
                 String publicationId = String.valueOf(binding.getValue("publication")).trim();
                 String issn = String.valueOf(binding.getValue("issn")).trim();
-                String revistas[] = new String[4];
-                revistas[0] = binding.getValue("revista") != null ? String.valueOf(binding.getValue("revista")) : "";
-                revistas[0] = revistas[0] != null && !revistas[0].equals("null") ? revistas[0].replace("\"", "").replace("^^<http://www.w3.org/2001/XMLSchema#string>", "").trim() : "";
-                revistas[0] = revistas[0].replace("&", " ");
+                Set<String> revistas = new HashSet<>();
+                
+                revistas.add(binding.getBinding("revista") != null ? binding.getBinding("revista").getValue().stringValue() : "");
+                revistas.add(binding.getBinding("pubName") != null ? binding.getBinding("pubName").getValue().stringValue() : "");
+                revistas.add(binding.getBinding("journal") != null ? binding.getBinding("journal").getValue().stringValue() : "");
+                
+                for (String revista : revistas) {
+                    if(!revista.trim().isEmpty()) {
+                        //System.out.println(distance.getSetNames(revista).toString().replaceAll("\\[", "").replaceAll("\\]", ""));
+                        if (compareJson(revista)) {
+                            distanceFile.println(publicationId + "," + revista.replace(",", ";") );
+                        }
+                    }
+                }
+                
+                
+                /*revista0 = revista0 != null && !revista0.equals("null") ? revista0.replace("\"", "").replace("^^<http://www.w3.org/2001/XMLSchema#string>", "").trim() : "";
+                revista0 = revista0.replace("&", " ");
                 //Publicacion
-                revistas[1] = binding.getBinding("pubName") != null ? binding.getBinding("pubName").getValue().stringValue() : "";
-                revistas[1] = revistas[1] != null ? revistas[1].replace("&", " ") : "";
+                String revista1 = binding.getBinding("pubName") != null ? binding.getBinding("pubName").getValue().stringValue() : "";
+                revista1 = revista1 != null ? revista1.replace("&", " ") : "";
                 //Journal
-                revistas[2] = binding.getBinding("journal") != null ? binding.getBinding("journal").getValue().stringValue() : "";
-                revistas[2] = revistas[2] != null ? revistas[2].replace("&", " ") : "";
+                String revista2 = binding.getBinding("journal") != null ? binding.getBinding("journal").getValue().stringValue() : "";
+                revista2 = revista2 != null ? revista2.replace("&", " ") : "";
 
                 issn = issn != null && !issn.equals("null") ? issn.replace("\"", "").replace("^^<http://www.w3.org/2001/XMLSchema#string>", "").trim().replace("X", "") : "";
 
                 //revistas[1] = revistas[1].split("\\.").length > 0 ? revistas[1].split("\\.")[0] : revistas[1];
-                revistas[3] = revistas[1].split("\\.").length > 1 ? revistas[1].split("\\.")[1] : "";
+                
                 //
                 String latindex = "";
-                /*if (!issn.equals("")) {
-                    latindex = NetClientPost.consultarLatindex(issn, false);
-                    out.println(publicationId + "," + revista.replace(",", "-") + "," + issn + "," + latindex.replace(",", ";"));
+                //if (!issn.equals("")) {
+                //    latindex = NetClientPost.consultarLatindex(issn, false);
+                //    out.println(publicationId + "," + revista.replace(",", "-") + "," + issn + "," + latindex.replace(",", ";"));
                     //guardar y colocar como verificado
-                } else*/
+                //} else
 
                 for (String revista : revistas) {
                     if (!revista.equals("")) {
@@ -173,7 +188,7 @@ public class LatindexMain {
 
                                 if ((distanciaRev + distanciaRev2)/2 > 0.7) {
                                     distanceFile.println(publicationId + "," + revista.replace(",", ";") + "," + titulo + "," + distanciaRev + "," + distanciaRev2 + "," + distanciaRev3 + "," + (distanciaRev + distanciaRev2)/2);
-                                    System.out.println("Output from Server .... \n Revista/Issn:" + revista + ". Titulo: " + titulo + ". \nDistancia: " + distanciaRev + " Jaccard: " + distanciaRev2 + " Jaro: " + distanciaRev3);
+                                    //System.out.println("Output from Server .... \n Revista/Issn:" + revista + ". Titulo: " + titulo + ". \nDistancia: " + distanciaRev + " Jaccard: " + distanciaRev2 + " Jaro: " + distanciaRev3);
                                     //break;
                                 }
                             }
@@ -181,7 +196,7 @@ public class LatindexMain {
                     }
 
                     //out.println(publicationId + "," + revista.replace(",", "-") + "," + issn + "," + latindex.replace(",", ";"));
-                }
+                }*/
                 contador++;
             }
             System.out.println("Fin del proceso ");
@@ -231,20 +246,53 @@ public class LatindexMain {
         return output;
     }
     
-    public static boolean compareJson(Set<String> revistas) {
+    public static boolean compareJson(String journal) {
         boolean equal = false;
+        Set<String> revistas;
         try {
             Distance distance = new Distance();
+            revistas = distance.getSetNames(journal);
 
             double coefficient = 0.0;
 
             for (String revista : revistas) {
                 for (String titulo : listNames) {
-                    coefficient = (distance.cosineSimilarityAndLevenshteinDistance(titulo, revista) + distance.jaccardSimilarity(titulo, revista)) / 2;
-
-                    if (coefficient > 0.90) {
-                        System.err.println(revista.replace(",", ";") + "," + titulo.replace(",", ";") + "," + coefficient);
+                    if (!revista.isEmpty() && !titulo.isEmpty() && revista.length() > 3 && titulo.length() > 3) {
+                        titulo = titulo.replace("(", "").trim();
+                        titulo = titulo.replace(")", "").trim();
+                        revista = revista.trim();
+                        coefficient = (distance.cosineSimilarityAndLevenshteinDistance(titulo, revista) + distance.jaccardSimilarity(titulo, revista)) / 2;
+                        
                     }
+                    
+                    
+                    /*if (journal.contains("-")) {
+                        list2.add(string.replace("-", ""));
+                        //list2.add(string.replace("-", " "));
+                    }*/
+                    
+                    float limit = (float) ((revista + titulo).length() >= 90 ? 0.9 : 0.85);
+                    
+                    if (coefficient > limit) {
+                        equal = true;
+                    }
+                    
+                    if (coefficient > 0.8 ) { //&& (jaccardDistance < 1.0 || jaccardDistance2 < 1.0)
+                        ModifiedJaccard jaccard = new ModifiedJaccard();
+                        
+                        double jaccardDistance = jaccard.Distance(journal.replace("-", ""), titulo);
+                        double jaccardDistance2 = jaccard.Distance(journal.replace("-", " "), titulo);
+                        
+                        //System.err.println(revista.replace(",", ";") + "," + titulo.replace(",", ";") + "," + coefficient);
+                        
+                        
+                        //System.err.println(revista.replace(",", ";") + "," + titulo.replace(",", ";") + "," + (coefficient + jaccard.Distance(revista, titulo))/2);
+                        System.err.println(journal.replace(",", ";") + "," + titulo.replace(",", ";") 
+                                + "," + jaccardDistance + "," + jaccardDistance2 + "," + coefficient + "," + equal);
+                        
+                    }
+                    
+                    
 
                 }
 
@@ -275,7 +323,7 @@ public class LatindexMain {
             while (iterator.hasNext()) {
                 JSONObject magazine = iterator.next();
                 String titulo = (String) ((JSONArray) magazine.get("tit_clave")).get(0);
-                listNames = distance.getSetNames(titulo);
+                listNames.addAll(distance.getSetNames(titulo));
                 
             }
 

@@ -86,7 +86,7 @@ public class Distance {
 
     String[] stopWords = {"Print", "En línea", "Impresa", "Online)", "Internet)", "Imprimé", "On-line", "Impresso", "En ligne"};
 
-    String[] tokens = {"\\.", ":", "\\(", "-", "\\)"};
+    String[] tokens = {"\\.", ":", "\\(", "-", "\\)", "\\,"};
 
 
     public Distance() throws IOException, ClassNotFoundException {
@@ -799,6 +799,7 @@ public class Distance {
 
         StringMetric metric
                 = with(new CosineSimilarity<String>())
+                .simplify(Simplifiers.removeDiacritics())
                 .simplify(Simplifiers.toLowerCase())
                 .simplify(Simplifiers.removeNonWord()).simplifierCache()
                 .tokenize(Tokenizers.qGram(3)).tokenizerCache().build();
@@ -846,8 +847,23 @@ public class Distance {
     private List<String> Tokenizer(String n, String token) {
         n = Clean(n);
         String[] tokens = n.split(token);
-        List<String> list = new ArrayList<String>(Arrays.asList(tokens));
+        List<String> list = new ArrayList<String>(Arrays.asList(tokens[0]));
         list.removeAll(Arrays.asList("", null));
+        
+        /*String myRegex = "[^a-zA-Z0-9]";
+        int index = 0;
+        for (String s : list) {
+            list.set(index++, s.replaceAll(myRegex, ""));
+        }*/
+        
+        list.add(n.replace("&", "").trim());
+        
+        int index = 0;
+        for (String s : list) {
+            list.set(index++, s.replace("  ", " ").trim());
+            //break;
+        }
+        
         return list;
     }
     
